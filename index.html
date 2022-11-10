@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Reflection (Three.js) Example 04 05</title>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0"
+    />
+    <link rel="stylesheet" href="css/base.css" />
+  </head>
+  <body>
+    <script src="stuff/three.js"></script>
+    <script src="stuff/ParametricGeometries.js"></script>
+
+    <script src="stuff/Detector.js"></script>
+    <script src="stuff/stats.js"></script>
+    <script src="stuff/OrbitControls.js"></script>
+    <script src="stuff/THREEx.KeyboardState.js"></script>
+    <script src="stuff/THREEx.FullScreen.js"></script>
+    <script src="stuff/THREEx.WindowResize.js"></script>
+
+    <!-- jQuery code to display an information button and box when clicked. -->
+    <script src="stuff/jquery-1.9.1.js"></script>
+    <script src="stuff/jquery-ui.js"></script>
+    <link rel="stylesheet" href="stuff/jquery-ui.css" />
+    <link rel="stylesheet" href="stuff/info.css" />
+    <script src="stuff/info.js"></script>
+    <div id="infoButton"></div>
+    <div id="infoBox" title="Demo Information">
+      This three.js demo is part of a collection at
+      <a href="http://stemkoski.github.io/Three.js/"
+        >http://stemkoski.github.io/Three.js/</a
+      >
+    </div>
+    <!-- ------------------------------------------------------------ -->
+
+    <div id="ThreeJS" style="position: absolute; left: 0px; top: 0px"></div>
+    <script>
+      /*
+                 	Three.js "tutorials by example"
+                 	Author: Lee Stemkoski
+                 	Date: July 2013 (three.js v59dev)
+                 */
+
+      // MAIN
+
+      // standard global variables
+      var container, scene, camera, renderer, controls, stats;
+      var keyboard = new THREEx.KeyboardState();
+      var clock = new THREE.Clock();
+
+      const renderListeners = [];
+      const registerRenderListener = (func) => renderListeners.push(func);
+
+      const rand = (min, max) => {
+        const diff = max - min;
+        return min + Math.random() * diff;
+      };
+
+      var cameraGroup = new THREE.Group();
+
+      // FUNCTIONS
+      function init() {
+        // SCENE
+        scene = new THREE.Scene();
+        // CAMERA
+        var SCREEN_WIDTH = window.innerWidth,
+          SCREEN_HEIGHT = window.innerHeight;
+        var VIEW_ANGLE = 45,
+          ASPECT = SCREEN_WIDTH / SCREEN_HEIGHT,
+          NEAR = 0.1,
+          FAR = 20000;
+
+        camera = new THREE.PerspectiveCamera(VIEW_ANGLE, ASPECT, NEAR, FAR);
+        cameraGroup.add(camera);
+        scene.add(cameraGroup);
+        const cameraDistance = 1500;
+        camera.position.set(cameraDistance, cameraDistance, cameraDistance);
+        camera.lookAt(scene.position);
+
+        registerRenderListener(() => {
+          cameraGroup.rotation.y += 0.01;
+        });
+        // RENDERER
+        if (Detector.webgl)
+          renderer = new THREE.WebGLRenderer({ antialias: true });
+        else renderer = new THREE.CanvasRenderer();
+        renderer.setSize(SCREEN_WIDTH, SCREEN_HEIGHT);
+        container = document.getElementById("ThreeJS");
+        container.appendChild(renderer.domElement);
+        // EVENTS
+        THREEx.WindowResize(renderer, camera);
+        THREEx.FullScreen.bindKey({ charCode: "m".charCodeAt(0) });
+        // CONTROLS
+        controls = new THREE.OrbitControls(camera, renderer.domElement);
+        // STATS
+        stats = new Stats();
+        stats.domElement.style.position = "absolute";
+        stats.domElement.style.bottom = "0px";
+        stats.domElement.style.zIndex = 100;
+        container.appendChild(stats.domElement);
+        // LIGHT
+
+        // FLOOR
+        /* var floorTexture = new THREE.TextureLoader().load(
+               "textures/football.jpg"
+             );
+             floorTexture.wrapS = floorTexture.wrapT = THREE.RepeatWrapping;
+             floorTexture.repeat.set(1, 1);
+             var floorMaterial = new THREE.MeshBasicMaterial({
+               map: floorTexture,
+               side: THREE.BackSide,
+             });
+             var floorGeometry = new THREE.PlaneGeometry(800 * 2, 526 * 2, 10, 10);
+             var floor = new THREE.Mesh(floorGeometry, floorMaterial);
+             floor.position.y = -0.5;
+             floor.rotation.x = Math.PI / 2;
+             scene.add(floor); */
+
+        const light2 = new THREE.PointLight(0xffffff);
+        light2.position.set(1000, 1000, 1000);
+        scene.add(light2);
+
+        // SKYBOX/FOG
+        var materialArray = [];
+        materialArray.push(
+          new THREE.MeshBasicMaterial({
+            map: THREE.ImageUtils.loadTexture("textures/sky-top.png"),
+          })
+        );
+        materialArray.push(
+          new THREE.MeshBasicMaterial({
+            map: THREE.ImageUtils.loadTexture("textures/sky-bottom.png"),
+          })
+        );
+        materialArray.push(
+          new THREE.MeshBasicMaterial({
+            map: THREE.ImageUtils.loadTexture("textures/sky-center.png"),
+          })
+        );
+        materialArray.push(
+          new THREE.MeshBasicMaterial({
+            map: THREE.ImageUtils.loadTexture("textures/sky-rightright.png"),
+          })
+        );
+        materialArray.push(
+          new THREE.MeshBasicMaterial({
+            map: THREE.ImageUtils.loadTexture("textures/sky-left.png"),
+          })
+        );
+        materialArray.push(
+          new THREE.MeshBasicMaterial({
+            map: THREE.ImageUtils.loadTexture("textures/sky-right.png"),
+          })
+        );
+        for (var i = 0; i < 6; i++) materialArray[i].side = THREE.BackSide;
+        var skyboxMaterial = new THREE.MeshFaceMaterial(materialArray);
+        var skyboxGeom = new THREE.BoxGeometry(10000, 10000, 10000, 64, 64, 64);
+        var skybox = new THREE.Mesh(skyboxGeom, skyboxMaterial);
+        scene.add(skybox);
+
+        ////////////
+        // CUSTOM //
+        ////////////
+
+        const boxes = Array.from({ length: 60 }).map(() => {
+          const width = rand(100, 500);
+          const height = rand(100, 500);
+          const depth = rand(100, 500);
+          const x = rand(-1500, 1500);
+          const y = rand(-1500, 1500);
+          const z = rand(-1500, 1500);
+          const xRot = rand(-0.001, 0.001);
+          const yRot = rand(-0.001, 0.001);
+          const zRot = rand(-0.001, 0.001);
+
+          return { width, height, depth, x, y, z, xRot, yRot, zRot };
+        });
+
+        for (const {
+          width,
+          height,
+          depth,
+          x,
+          y,
+          z,
+          xRot,
+          yRot,
+          zRot,
+        } of boxes) {
+          const cubeGeom = new THREE.CubeGeometry(
+            width,
+            height,
+            depth,
+            1,
+            1,
+            1
+          );
+          const mirrorCubeCamera = new THREE.CubeCamera(0.1, 5000, 512);
+          scene.add(mirrorCubeCamera);
+          const mirrorCubeMaterial = new THREE.MeshBasicMaterial({
+            envMap: mirrorCubeCamera.renderTarget,
+          });
+          const mirrorCube = new THREE.Mesh(cubeGeom, mirrorCubeMaterial);
+          mirrorCube.position.set(x, y, z);
+          mirrorCubeCamera.position.set(x, y, z);
+          scene.add(mirrorCube);
+
+          registerRenderListener(() => {
+            mirrorCube.visible = false;
+            mirrorCubeCamera.update(renderer, scene);
+            mirrorCube.visible = true;
+            mirrorCube.rotation.x += xRot;
+            mirrorCube.rotation.y += yRot;
+            mirrorCube.rotation.z += zRot;
+          });
+        }
+
+        const sprinkles = Array.from({ length: 100 }).map(() => {
+          const width = rand(30, 50);
+          const height = rand(30, 50);
+          const depth = rand(30, 50);
+          const x = rand(-1200, 1200);
+          const y = rand(-1600, 1600);
+          const z = rand(-1200, 1200);
+          const opacity = Math.random();
+          const r = Math.floor(rand(50, 170));
+          const g = Math.floor(rand(0, 96));
+          const b = Math.floor(rand(100, 255));
+          const color = r * Math.pow(16, 4) + g * Math.pow(16, 2) + b;
+          return { width, height, depth, x, y, z, opacity, color };
+        });
+
+        for (const {
+          width,
+          height,
+          depth,
+          x,
+          y,
+          z,
+          opacity,
+          color,
+        } of sprinkles) {
+          const geometry = new THREE.CubeGeometry(
+            width,
+            height,
+            depth,
+            1,
+            1,
+            1
+          );
+          const material = new THREE.MeshBasicMaterial({
+            color,
+            opacity: 0.5,
+          });
+
+          const mesh = new THREE.Mesh(geometry, material);
+          mesh.position.set(x, y, z);
+          scene.add(mesh);
+        }
+      }
+
+      function animate() {
+        requestAnimationFrame(animate);
+
+        renderListeners.forEach((listener) => listener());
+
+        renderer.render(scene, camera);
+
+        if (keyboard.pressed("z")) {
+          // do something
+        }
+
+        controls.update();
+        stats.update();
+      }
+
+      init();
+      animate();
+    </script>
+  </body>
+</html>
